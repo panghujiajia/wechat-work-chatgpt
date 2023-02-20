@@ -1,171 +1,97 @@
+import axios from "axios";
 import { ChatGPTPool } from "./chatgpt.js";
 import { config } from "./config.js";
-import { ContactInterface, RoomInterface } from "wechaty/impls";
-import { Message } from "wechaty";
-enum MessageType {
-  Unknown = 0,
 
-  Attachment = 1, // Attach(6),
-  Audio = 2, // Audio(1), Voice(34)
-  Contact = 3, // ShareCard(42)
-  ChatHistory = 4, // ChatHistory(19)
-  Emoticon = 5, // Sticker: Emoticon(15), Emoticon(47)
-  Image = 6, // Img(2), Image(3)
-  Text = 7, // Text(1)
-  Location = 8, // Location(48)
-  MiniProgram = 9, // MiniProgram(33)
-  GroupNote = 10, // GroupNote(53)
-  Transfer = 11, // Transfers(2000)
-  RedEnvelope = 12, // RedEnvelopes(2001)
-  Recalled = 13, // Recalled(10002)
-  Url = 14, // Url(5)
-  Video = 15, // Video(4), Video(43)
-  Post = 16, // Moment, Channel, Tweet, etc
-}
+const fail = {
+  code: -1,
+  message: 'fail',
+  data: {
+    type: 0,
+    info: {
+      text: ''
+    }
+  }
+};
 
-const SINGLE_MESSAGE_MAX_SIZE = 500;
+const success = {
+  code: 0,
+  message: 'success'
+};
+
 export class ChatGPTBot {
   // Record talkid with conversation id
   chatGPTPool = new ChatGPTPool();
-  chatPrivateTiggerKeyword = config.chatPrivateTiggerKeyword;
-  chatTiggerRule = config.chatTiggerRule? new RegExp(config.chatTiggerRule): undefined;
-  botName: string = "";
   ready = false;
-  setBotName(botName: string) {
-    this.botName = botName;
-  }
-  get chatGroupTiggerRegEx(): RegExp {
-    return new RegExp(`^@${this.botName}\\s`);
-  }
-  get chatPrivateTiggerRule(): RegExp | undefined {
-    const { chatPrivateTiggerKeyword, chatTiggerRule } = this;
-    let regEx = chatTiggerRule
-    if (!regEx && chatPrivateTiggerKeyword) {
-      regEx = new RegExp(chatPrivateTiggerKeyword)
-    }
-    return regEx
-  }
+  robotId = config.robotId
+
   async startGPTBot() {
     console.debug(`Start GPT Bot Config is:${JSON.stringify(config)}`);
     await this.chatGPTPool.startPools();
     console.debug(`🤖️ Start GPT Bot Success, ready to handle message!`);
     this.ready = true;
   }
-  // TODO: Add reset conversation id and ping pong
-  async command(): Promise<void> {}
-  // remove more times conversation and mention
-  cleanMessage(rawText: string, privateChat: boolean = false): string {
-    let text = rawText;
-    const item = rawText.split("- - - - - - - - - - - - - - -");
-    if (item.length > 1) {
-      text = item[item.length - 1];
-    }
-    
-    const { chatTiggerRule, chatPrivateTiggerRule } = this;
-    
-    if (privateChat && chatPrivateTiggerRule) {
-      text = text.replace(chatPrivateTiggerRule, "")
-    } else if (!privateChat) {
-      text = text.replace(this.chatGroupTiggerRegEx, "")
-      text = chatTiggerRule? text.replace(chatTiggerRule, ""): text
-    }
-    // remove more text via - - - - - - - - - - - - - - -
-    return text
-  }
+
   async getGPTMessage(text: string, talkerId: string): Promise<string> {
     return await this.chatGPTPool.sendMessage(text, talkerId);
   }
-  // The message is segmented according to its size
-  async trySay(
-    talker: RoomInterface | ContactInterface,
-    mesasge: string
-  ): Promise<void> {
-    const messages: Array<string> = [];
-    let message = mesasge;
-    while (message.length > SINGLE_MESSAGE_MAX_SIZE) {
-      messages.push(message.slice(0, SINGLE_MESSAGE_MAX_SIZE));
-      message = message.slice(SINGLE_MESSAGE_MAX_SIZE);
-    }
-    messages.push(message);
-    for (const msg of messages) {
-      await talker.say(msg);
-    }
-  }
-  // Check whether the ChatGPT processing can be triggered
-  tiggerGPTMessage(text: string, privateChat: boolean = false): boolean {
-    const { chatTiggerRule } = this;
-    let triggered = false;
-    if (privateChat) {
-      const regEx = this.chatPrivateTiggerRule
-      triggered = regEx? regEx.test(text): true;
-    } else {
-      triggered = this.chatGroupTiggerRegEx.test(text);
-      // group message support `chatTiggerRule`
-      if (triggered && chatTiggerRule) {
-        triggered = chatTiggerRule.test(text.replace(this.chatGroupTiggerRegEx, ""))
-      }
-    }
-    if (triggered) {
-      console.log(`🎯 Triggered ChatGPT: ${text}`);
-    }
-    return triggered;
-  }
-  // Filter out the message that does not need to be processed
-  isNonsense(
-    talker: ContactInterface,
-    messageType: MessageType,
-    text: string
-  ): boolean {
-    return (
-      talker.self() ||
-      // TODO: add doc support
-      messageType !== MessageType.Text ||
-      talker.name() === "微信团队" ||
-      // 语音(视频)消息
-      text.includes("收到一条视频/语音聊天消息，请在手机上查看") ||
-      // 红包消息
-      text.includes("收到红包，请在手机上查看") ||
-      // Transfer message
-      text.includes("收到转账，请在手机上查看") ||
-      // 位置消息
-      text.includes("/cgi-bin/mmwebwx-bin/webwxgetpubliclinkimg")
-    );
-  }
 
-  async onPrivateMessage(talker: ContactInterface, text: string) {
-    const talkerId = talker.id;
-    const gptMessage = await this.getGPTMessage(text, talkerId);
-    await this.trySay(talker, gptMessage);
-  }
+  async onMessage(params: any) {
+    // params = {
+    //     groupName: 'ChatGPT', // 群名
+    //     atMe: 'true', // 是否@我
+    //     groupRemark: '', // 群备注
+    //     spoken: '你好', // 消息内容
+    //     textType: '1', //
+    //     rawSpoken: '@OpenAi 你好', // 原始消息文本
+    //     receivedName: '面包屑', // 提问者名称
+    //     roomType: '1' // 1=外部群 2=外部联系人 3=内部群 4=内部联系人
+    // };
+    try {
+      const { groupName, roomType, spoken, receivedName } = params;
+      if (spoken) {
+        const talkerId = Buffer.from(`${groupName}_${receivedName}`).toString('base64');
+        const gptMessage = await this.getGPTMessage(spoken, talkerId);
+        console.log(`Q：${spoken}`);
 
-  async onGroupMessage(
-    talker: ContactInterface,
-    text: string,
-    room: RoomInterface
-  ) {
-    const talkerId = room.id + talker.id;
-    const gptMessage = await this.getGPTMessage(text, talkerId);
-    const result = `${text}\n ------\n ${gptMessage}`;
-    await this.trySay(room, result);
-  }
-  async onMessage(message: Message) {
-    const talker = message.talker();
-    const rawText = message.text();
-    const room = message.room();
-    const messageType = message.type();
-    const privateChat = !room;
-    if (this.isNonsense(talker, messageType, rawText)) {
-      return;
-    }
-    if (this.tiggerGPTMessage(rawText, privateChat)) {
-      const text = this.cleanMessage(rawText, privateChat);
-      if (privateChat) {
-        return await this.onPrivateMessage(talker, text);
-      } else {
-        return await this.onGroupMessage(talker, text, room);
+        console.log(`A：${gptMessage}`);
+        let replyItem: any = {
+          type: 203
+        };
+        // 群
+        if (['1', '3'].includes(roomType)) {
+          replyItem.titleList = [groupName];
+          replyItem.atList = [receivedName];
+          replyItem.receivedContent = ` ${gptMessage}`;
+        } else {
+          replyItem.titleList = [receivedName];
+          replyItem.receivedContent = gptMessage;
+        }
+        // 给机器人发指令
+        await axios.post(
+          `/wework/sendRawMessage`,
+          {
+            socketType: 2,
+            list: [replyItem]
+          },
+          {
+            params: {
+              robotId: this.robotId
+            }
+          }
+        );
       }
-    } else {
-      return;
+      return {
+        ...success,
+        data: {
+          type: 5000,
+          info: {
+            text: ''
+          }
+        }
+      };
+    } catch (error: any) {
+      console.log(error.response);
+      return fail;
     }
   }
 }

@@ -27,4 +27,5 @@ export interface IConfig {
   openAIProxy?: string;
   clearanceToken: string;
   userAgent: string;
+  robotId: string;
 }
