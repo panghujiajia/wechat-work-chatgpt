@@ -15,10 +15,23 @@ async function main() {
   })
 
   // 接收回调
-  app.post('/workTool/thirdQa', jsonParser, async (req: any, res: any) => {
+  app.post('/workTool/thirdQa', jsonParser, (req: any, res: any) => {
     const { body } = req;
-    console.log(`params：${body}`);
-    return await chatGPTBot.onMessage(body);
+
+    console.log(`params：${JSON.stringify(body)}`);
+
+    res.send({
+      code: 0,
+      message: 'success',
+      data: {
+        type: 5000,
+        info: {
+          text: ''
+        }
+      }
+    });
+    
+    chatGPTBot.onMessage(body);
   })
 
   app.listen(port, () => {

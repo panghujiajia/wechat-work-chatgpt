@@ -2,21 +2,6 @@ import axios from "axios";
 import { ChatGPTPool } from "./chatgpt.js";
 import { config } from "./config.js";
 
-const fail = {
-  code: -1,
-  message: 'fail',
-  data: {
-    type: 0,
-    info: {
-      text: ''
-    }
-  }
-};
-
-const success = {
-  code: 0,
-  message: 'success'
-};
 
 export class ChatGPTBot {
   // Record talkid with conversation id
@@ -48,12 +33,13 @@ export class ChatGPTBot {
     // };
     try {
       const { groupName, roomType, spoken, receivedName } = params;
+      console.log(`\nQ：${spoken}`);
       if (spoken) {
         const talkerId = Buffer.from(`${groupName}_${receivedName}`).toString('base64');
         const gptMessage = await this.getGPTMessage(spoken, talkerId);
-        console.log(`Q：${spoken}`);
 
         console.log(`A：${gptMessage}`);
+
         let replyItem: any = {
           type: 203
         };
@@ -80,18 +66,7 @@ export class ChatGPTBot {
           }
         );
       }
-      return {
-        ...success,
-        data: {
-          type: 5000,
-          info: {
-            text: ''
-          }
-        }
-      };
     } catch (error: any) {
-      console.log(error.response);
-      return fail;
     }
   }
 }

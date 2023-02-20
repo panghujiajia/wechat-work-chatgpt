@@ -43,4 +43,5 @@ export const config: IConfig = {
   openAIProxy: configFile.openAIProxy,
   clearanceToken: configFile.clearanceToken,
   userAgent: configFile.userAgent,
+  robotId: configFile.robotId
 };
