@@ -53,8 +53,8 @@ export class ChatGPTBot {
           replyItem.receivedContent = gptMessage;
         }
         // 给机器人发指令
-        await axios.post(
-          `/wework/sendRawMessage`,
+        const res = await axios.post(
+          `https://worktool.asrtts.cn/wework/sendRawMessage`,
           {
             socketType: 2,
             list: [replyItem]
@@ -65,8 +65,12 @@ export class ChatGPTBot {
             }
           }
         );
+        console.log(res.data.message);
       }
     } catch (error: any) {
+      console.log('ERROR：');
+      console.log(error);
+
     }
   }
 }

@@ -11,7 +11,7 @@ async function main() {
   const initializedAt = Date.now()
 
   app.get('/', (req: any, res: any) => {
-    res.send('Hello World!')
+    res.send('work tool')
   })
 
   // 接收回调
@@ -30,7 +30,7 @@ async function main() {
         }
       }
     });
-    
+
     chatGPTBot.onMessage(body);
   })
 
